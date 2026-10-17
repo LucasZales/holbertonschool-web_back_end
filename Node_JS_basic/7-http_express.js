@@ -1,59 +1,57 @@
-#!/usr/bin/node
-
 const express = require('express');
 const fs = require('fs');
 
 const app = express();
-const database = process.argv[2];
+const port = 1245;
 
 app.get('/', (req, res) => {
-  res.type('text').send('Hello Holberton School!');
+  res.send('Hello Holberton School!');
 });
 
 app.get('/students', (req, res) => {
-  res.type('text');
+  res.set('Content-Type', 'text/plain');
+  const database = process.argv[2];
+  const countStudents = ((database) => {
+    const promise = new Promise((resolve, reject) => {
+      fs.readFile(database, 'utf-8', (error, data) => {
+        if (error) {
+          reject(new Error('Cannot load the database'));
+        } else {
+          const cleanData = data
+            .split('\n').slice(1)
+            .map((value) => value.trim())
+            .filter((value) => value !== '')
+            .map((value) => value.split(','));
+          const students = cleanData.reduce((accumulator, student) => {
+            if (accumulator[student[3]]) {
+              accumulator[student[3]].push(student[0]);
+            } else {
+              accumulator[student[3]] = [student[0]];
+            }
+            return accumulator;
+          }, {});
 
-  if (!database) {
-    res.send('This is the list of our students\nCannot load the database');
-    return;
-  }
+          let output = `Number of students: ${cleanData.length}\n`;
+          const keys = Object.keys(students);
+          keys.forEach((key) => {
+            const studentsCount = students[key].length;
+            output += `Number of students in ${key}: ${studentsCount}. List: ${students[key].join(', ')}\n`;
+          });
 
-  fs.readFile(database, 'utf8', (error, data) => {
-    if (error) {
-      res.send('This is the list of our students\nCannot load the database');
-      return;
-    }
-
-    const cleanData = data.split('\n').slice(1);
-    const validStudents = cleanData
-      .map((line) => line.trim())
-      .filter((line) => line !== '');
-
-    const studentsArray = validStudents.map((line) => line.split(','));
-    const students = studentsArray.reduce((accumulator, student) => {
-      const field = student[3];
-      const firstname = student[0];
-
-      if (accumulator[field]) {
-        accumulator[field].push(firstname);
-      } else {
-        accumulator[field] = [firstname];
-      }
-
-      return accumulator;
-    }, {});
-
-    let output = `This is the list of our students\n`;
-    output += `Number of students: ${studentsArray.length}\n`;
-
-    Object.keys(students).forEach((field) => {
-      output += `Number of students in ${field}: ${students[field].length}. List: ${students[field].join(', ')}\n`;
+          resolve(output);
+        }
+      });
     });
-
-    res.send(output.trimEnd());
+    return promise;
   });
+  countStudents(database)
+    .then((result) => {
+      res.send(`This is the list of our students\n${result}`);
+    })
+    .catch((error) => {
+      res.send(`This is the list of our students\n${error.message}`);
+    });
 });
 
-app.listen(1245);
-
+app.listen(port);
 module.exports = app;
